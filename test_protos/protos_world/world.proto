@@ -1,0 +1,10 @@
+syntax = "proto3";
+option go_package="github.com/yaoguangduan/proto-editor/pbgen/test_protos/protos_world";
+
+import "protos/proto_editor_option.proto";
+import "test_protos/protos_user/user.proto";
+message World {
+  option (editor_gen) = true;
+  optional int32 id = 1;
+  optional User manager = 2;
+}

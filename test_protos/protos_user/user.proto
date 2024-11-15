@@ -1,0 +1,10 @@
+syntax = "proto3";
+option go_package="github.com/yaoguangduan/proto-editor/pbgen/test_protos/protos_user";
+
+import "protos/proto_editor_option.proto";
+
+message User {
+  option (editor_key) = 1;
+  optional string name = 1;
+  optional int32 age = 2;
+}

@@ -1,0 +1,9 @@
+syntax = "proto3";
+// .\protoc.exe --go_out=proto_options --go_opt=paths=source_relative --proto_path=protos .\protos\proto_editor_option.proto
+option go_package="github.com/yaoguangduan/proto-editor/proto_options";
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions {
+  optional bool editor_gen = 50200;
+  optional int32 editor_key = 50201;
+}
