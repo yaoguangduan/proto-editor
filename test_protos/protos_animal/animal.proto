@@ -1,0 +1,13 @@
+syntax = "proto3";
+option go_package="github.com/yaoguangduan/proto-editor/pbgen/protos_animal";
+
+enum AnimalType {
+  AT_Dog = 0;
+  AT_Cat = 1;
+  AT_Elephant = 2;
+}
+message Animal {
+  optional AnimalType type = 2;
+  optional uint32 count = 3;
+  repeated string foods = 4;
+}

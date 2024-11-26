@@ -1,10 +1,15 @@
 syntax = "proto3";
-option go_package="github.com/yaoguangduan/proto-editor/pbgen/test_protos/protos_user";
-
-import "protos/proto_editor_option.proto";
-
+option go_package="github.com/yaoguangduan/proto-editor/pbgen/protos_user";
+import "protos_animal/animal.proto";
 message User {
-  option (editor_key) = 1;
   optional string name = 1;
   optional int32 age = 2;
+  map<int64,Animal> pet = 3;
+  repeated Friend friends = 4;
+  repeated float tempChange = 5;
+}
+
+message Friend {
+  optional string name = 1;
+  optional float relation = 2;
 }

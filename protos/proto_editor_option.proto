@@ -1,9 +1,51 @@
 syntax = "proto3";
 // .\protoc.exe --go_out=proto_options --go_opt=paths=source_relative --proto_path=protos .\protos\proto_editor_option.proto
-option go_package="github.com/yaoguangduan/proto-editor/proto_options";
+option go_package="github.com/yaoguangduan/proto-editor/protodef";
 import "google/protobuf/descriptor.proto";
 
 extend google.protobuf.MessageOptions {
   optional bool editor_gen = 50200;
   optional int32 editor_key = 50201;
+}
+
+enum ListOpType {
+  None = 0;
+  Insert = 1;
+  Delete = 2;
+  Modify = 3;
+  Clear = 4;
+}
+message ListOpLog {
+  ListOpType opType = 1;
+  int32 pos = 2;
+  int32 ref_idx = 3;
+}
+message ListMutState {
+  repeated ListOpLog log = 1;
+}
+
+message MapMutState {
+  optional bool clear = 1;
+  repeated string strList = 2;
+  repeated int32 i32List = 3;
+  repeated int64 i64List = 4;
+  repeated uint32 u32List = 5;
+  repeated uint64 u64List = 6;
+  repeated bool boolList = 7;
+}
+
+message MutState {
+  map<int32,ListMutState> array = 1;
+  map<int32,MapMutState> map = 2;
+}
+
+message MapKey {
+  oneof key {
+    int32 i32 = 1;
+    int64 i64 = 2;
+    uint32 u32 = 3;
+    uint64 u64 = 4;
+    string str =5;
+    bool b = 6;
+  }
 }

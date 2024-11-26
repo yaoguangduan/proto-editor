@@ -2,6 +2,7 @@ package generate
 
 import (
 	"fmt"
+	"github.com/yaoguangduan/proto-editor/internal/generate/util"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-func genImport(gen *protogen.Plugin, g *protogen.GeneratedFile, f *fileInfo, imp protoreflect.FileImport) {
+func genImport(gen *protogen.Plugin, g *protogen.GeneratedFile, f *util.FileInfo, imp protoreflect.FileImport) {
 	impFile, ok := gen.FilesByPath[imp.Path()]
 	if !ok {
 		return

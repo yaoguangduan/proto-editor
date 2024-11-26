@@ -1,0 +1,20 @@
+syntax = "proto3";
+option go_package="github.com/yaoguangduan/proto-editor/pbgen/protos_enum";
+
+enum CivilLevel {
+  CL_Bronze = 0;
+  CL_Iron = 1;
+  CL_Sliver = 2;
+  CL_Gold = 3;
+}
+enum State {
+  Broken = 0;
+  Progress = 1;
+  Stop = 2;
+}
+
+enum WorldType {
+  Planet = 0;
+  Comet = 1;
+  Star = 2;
+}

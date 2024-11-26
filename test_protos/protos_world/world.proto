@@ -1,10 +1,78 @@
 syntax = "proto3";
-option go_package="github.com/yaoguangduan/proto-editor/pbgen/test_protos/protos_world";
+option go_package="github.com/yaoguangduan/proto-editor/pbgen/protos_world";
 
-import "protos/proto_editor_option.proto";
-import "test_protos/protos_user/user.proto";
+import "proto_editor_option.proto";
+import "protos_user/user.proto";
+import "protos_animal/animal.proto";
+import "protos_enum/enums.proto";
 message World {
   option (editor_gen) = true;
   optional int32 id = 1;
-  optional User manager = 2;
+  optional string desc = 2;
+  optional int64 alive = 3;
+  optional float location = 4;
+  optional double weight = 5;
+  optional User manager = 6;
+  map<int64,Animal> animals = 7;
+  optional CivilLevel cl = 8;
+  optional uint32 cost = 9;
+  optional sfixed32 area = 10;
+  map<string,int32> treeCntMap = 11;
+  repeated State stateRecords = 12;
+  repeated string logs = 13;
+  repeated bool historyResults = 14;
+  map<string,User> assistants = 15;
+  map<bool,uint32> resultCnt = 16;
+  repeated uint64 tracks = 17;
+  optional bool health = 18;
+  map<string,WorldType> neighborNameTypes = 19;
+}
+
+message Test {
+  option (editor_gen) = true;
+  optional int32 i32 = 1;
+  optional int64 i64 = 2;
+  optional uint32 u32 = 3;
+  optional uint64 u64 = 4;
+  optional bool b = 11;
+  optional string str = 12;
+  optional bytes bys = 13;
+  optional TestEnum te = 14;
+  optional float f32 = 15;
+  optional double f64 = 16;
+  optional TestMsg msg = 17;
+
+  repeated int32 i32List = 18;
+  repeated int64 i64List = 28;
+  repeated uint32 u32List = 38;
+  repeated uint64 u64List = 48;
+  repeated bool bList = 118;
+  repeated string strList = 128;
+  repeated TestEnum teList = 148;
+  repeated float f32List = 158;
+  repeated double f64List = 168;
+  repeated TestMsg msgList = 178;
+
+  map<int32,string> i32StrMap = 19;
+  map<string,float> strF32Map  = 29;
+  map<bool,uint64> boolU64Map = 39;
+  map<uint64,double> u64F64Map = 49;
+  map<int32,TestMsg> msgMap = 59;
+  map<string,PlainMsg> strMsgMap = 69;
+  map<uint32,TestEnum> enumMap = 79;
+}
+message TestMsg {
+  optional int32 field1 = 1;
+  optional string  field2 = 2;
+  optional PlainMsg innerMsg = 3;
+}
+message PlainMsg {
+  optional int32 i32 = 1;
+  optional string str = 2;
+  optional bool b = 3;
+}
+enum TestEnum {
+  Test0 = 0;
+  Test1 = 1;
+  Test2 = 2;
 }

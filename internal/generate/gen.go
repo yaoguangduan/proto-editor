@@ -1,89 +1,199 @@
 package generate
 
 import (
-	"fmt"
 	"github.com/samber/lo"
+	"github.com/yaoguangduan/proto-editor/internal/generate/util"
+	"github.com/yaoguangduan/proto-editor/protodef"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	"log"
 )
 
+type fileMessageInfo struct {
+	file     *protogen.File
+	messages []*protogen.Message
+}
+
 func Generate(gen *protogen.Plugin) {
-	msgMap := make(map[string]lo.Tuple2[*protogen.Message, string])
-	enumMap := make(map[string]lo.Tuple2[*protogen.Enum, string])
+	allNeedGenMsg := make(map[string]*protogen.Message)
 	for _, file := range gen.Files {
 		for _, msg := range file.Messages {
-			msgMap[string(msg.Desc.Name())] = lo.Tuple2[*protogen.Message, string]{A: msg, B: file.GeneratedFilenamePrefix}
-		}
-		for _, enum := range file.Enums {
-			enumMap[string(enum.Desc.Name())] = lo.Tuple2[*protogen.Enum, string]{A: enum, B: file.GeneratedFilenamePrefix}
+			if proto.HasExtension(msg.Desc.Options(), protodef.E_EditorGen) {
+				genIt := proto.GetExtension(msg.Desc.Options(), protodef.E_EditorGen).(bool)
+				if genIt {
+					findMessageDep(allNeedGenMsg, msg, gen)
+				}
+			}
 		}
 	}
-
-	fileMessagesMap := make(map[string]map[string]*protogen.Message)
-	for _, tuple := range msgMap {
-		msg := tuple.A
-		if proto.HasExtension(msg.Desc.Options(), syncproto.E_SyncGen) {
-			genIt := proto.GetExtension(msg.Desc.Options(), syncproto.E_SyncGen).(bool)
-			if genIt {
-				findMessageDep(fileMessagesMap, tuple, msgMap)
+	log.Println(allNeedGenMsg)
+	for _, files := range gen.Files {
+		messages := make([]*protogen.Message, 0)
+		for _, msg := range files.Messages {
+			if lo.HasKey(allNeedGenMsg, string(msg.Desc.FullName())) {
+				messages = append(messages, msg)
 			}
+		}
+		if len(messages) > 0 {
+			generateOneFile(gen, files, messages, allNeedGenMsg)
+		}
+		if len(files.Messages) <= 0 && len(files.Enums) > 0 {
+			generateOneFileOnlyEnum(gen, files, messages, allNeedGenMsg)
+
 		}
 	}
 
 }
-
-func generateOneFile(gen *protogen.Plugin, file *protogen.File, messages []*protogen.Message) *protogen.GeneratedFile {
+func generateOneFileOnlyEnum(gen *protogen.Plugin, file *protogen.File, messages []*protogen.Message, allNeedGen map[string]*protogen.Message) *protogen.GeneratedFile {
 	filename := file.GeneratedFilenamePrefix + ".editor.go"
 	g := gen.NewGeneratedFile(filename, file.GoImportPath)
-	f := newFileInfo(file)
+	f := util.NewFileInfo(file)
 
 	g.P("package ", f.GoPackageName)
 	g.P()
 
+	g.P("import \"github.com/yaoguangduan/proto-editor/pbeditor\"")
+	g.P("import \"iter\"")
+	g.P("import \"math\"")
+	g.P("import \"slices\"")
+	g.P("import \"github.com/yaoguangduan/proto-editor/protodef\"")
+	g.P("import \"google.golang.org/protobuf/encoding/protowire\"")
+	g.P("import \"google.golang.org/protobuf/proto\"")
+
+	for _, enum := range f.Enums {
+		maps, list := allArrayAndMapDependencyOfEnum(g, f, allNeedGen, enum)
+		if list != nil {
+			GenListEditorForEnum(gen, g, f, enum, list)
+		}
+		for _, field := range maps {
+			GenMapEditorForEnum(gen, g, f, enum, field)
+		}
+
+	}
+
+	g.P(`
+func unused() {
+	_ = math.MinInt
+	_ = slices.Min([]int32{})
+	_ = iter.Seq[int32](func(yield func(int32) bool) {
+		
+	})
+	_ = protodef.ListOpType_Delete
+	_ = pbeditor.U32List{}
+	_ = protowire.Number(1)
+	_ = proto.Error
+}`)
+	return g
+}
+func generateOneFile(gen *protogen.Plugin, file *protogen.File, messages []*protogen.Message, allNeedGen map[string]*protogen.Message) *protogen.GeneratedFile {
+	filename := file.GeneratedFilenamePrefix + ".editor.go"
+	g := gen.NewGeneratedFile(filename, file.GoImportPath)
+	f := util.NewFileInfo(file)
+
+	g.P("package ", f.GoPackageName)
+	g.P()
+
+	g.P("import \"github.com/yaoguangduan/proto-editor/pbeditor\"")
+	g.P("import \"iter\"")
+	g.P("import \"math\"")
+	g.P("import \"slices\"")
+	g.P("import \"github.com/yaoguangduan/proto-editor/protodef\"")
+	g.P("import \"google.golang.org/protobuf/encoding/protowire\"")
+	g.P("import \"google.golang.org/protobuf/proto\"")
 	for i, imps := 0, f.Desc.Imports(); i < imps.Len(); i++ {
 		genImport(gen, g, f, imps.Get(i))
 	}
+	for _, enum := range f.Enums {
+		maps, list := allArrayAndMapDependencyOfEnum(g, f, allNeedGen, enum)
+		if list != nil {
+			GenListEditorForEnum(gen, g, f, enum, list)
+		}
+		for _, field := range maps {
+			GenMapEditorForEnum(gen, g, f, enum, field)
+		}
+
+	}
+	for _, msg := range messages {
+		maps, list := allArrayAndMapDependency(g, f, allNeedGen, msg)
+		if list != nil {
+			GenListEditor(gen, g, f, msg, list)
+		}
+		for _, field := range maps {
+			GenMapEditor(gen, g, f, msg, field)
+		}
+		GenStruct(gen, g, f, msg)
+		GenNewMethod(gen, g, f, msg)
+		GenInterfaceMethod(gen, g, f, msg)
+		GenClearFunc(gen, g, f, msg)
+		GenCopyFunc(gen, g, f, msg)
+		GenDirtyFunc(gen, g, f, msg)
+		GenGetSet(gen, g, f, msg)
+		GenOriginalSetFunc(gen, g, f, msg)
+	}
+	g.P(`
+func unused() {
+	_ = math.MinInt
+	_ = slices.Min([]int32{})
+	_ = iter.Seq[int32](func(yield func(int32) bool) {
+		
+	})
+	_ = protodef.ListOpType_Delete
+	_ = pbeditor.U32List{}
+	_ = protowire.Number(1)
+	_ = proto.Error
+}`)
 	return g
 }
 
-func findMessageDep(fileMessagesMap map[string]map[string]*protogen.Message, tuple lo.Tuple2[*protogen.Message, string], msgMap map[string]lo.Tuple2[*protogen.Message, string]) {
-	msg := tuple.A
-	msgName := string(msg.Desc.Name())
-	if _, ok := fileMessagesMap[tuple.B]; !ok {
-		fileMessagesMap[tuple.B] = make(map[string]*protogen.Message)
+func allArrayAndMapDependencyOfEnum(g *protogen.GeneratedFile, f *util.FileInfo, allNeed map[string]*protogen.Message, enum *protogen.Enum) (map[string]*protogen.Field, *protogen.Field) {
+	var arrField *protogen.Field
+	maps := make(map[string]*protogen.Field)
+	for _, msg := range allNeed {
+		for _, field := range msg.Fields {
+			if field.Desc.IsMap() {
+				if field.Message.Fields[1].Enum != nil && field.Message.Fields[1].Enum == enum {
+					gt, _ := util.OriFieldGoType(g, f, field.Message.Fields[0])
+					maps[gt] = field
+				}
+			}
+			if field.Desc.IsList() && field.Enum != nil && field.Enum == enum {
+				arrField = field
+			}
+		}
 	}
-	fileMessagesMap[tuple.B][msgName] = msg
+	return maps, arrField
+}
+
+func allArrayAndMapDependency(g *protogen.GeneratedFile, f *util.FileInfo, allNeed map[string]*protogen.Message, message *protogen.Message) (map[string]*protogen.Field, *protogen.Field) {
+	var arrField *protogen.Field
+	maps := make(map[string]*protogen.Field)
+	for _, msg := range allNeed {
+		for _, field := range msg.Fields {
+			if field.Desc.IsMap() {
+				if field.Message.Fields[1].Message != nil && field.Message.Fields[1].Message == message {
+					gt, _ := util.OriFieldGoType(g, f, field.Message.Fields[0])
+					maps[gt] = field
+				}
+			}
+			if field.Desc.IsList() && field.Message != nil && field.Message == message {
+				arrField = field
+			}
+		}
+	}
+	return maps, arrField
+}
+
+func findMessageDep(allNeedGenMsg map[string]*protogen.Message, msg *protogen.Message, msgMap *protogen.Plugin) {
+	allNeedGenMsg[string(msg.Desc.FullName())] = msg
 	for _, field := range msg.Fields {
-		if field.Desc.IsList() && field.Message != nil && field.Desc.Kind() != protoreflect.EnumKind {
-			panic(fmt.Sprintf("msg %s can not contain message(%s) list", msgName, field.Desc.Name()))
-		}
-		if field.Desc.IsMap() && field.Message.Fields[1].Message == nil {
-			panic(fmt.Sprintf("msg %s can not contain base(%s) map val", msgName, field.Message.Fields[1].Desc.Name()))
-		}
 		if field.Desc.IsMap() {
 			mapVal := field.Message.Fields[1]
-			if proto.HasExtension(mapVal.Message.Desc.Options(), syncproto.E_SyncKey) {
-				genKey := proto.GetExtension(mapVal.Message.Desc.Options(), syncproto.E_SyncKey).(int32)
-				fk := mapVal.Message.Desc.Fields().ByNumber(protoreflect.FieldNumber(genKey))
-				if fk == nil {
-					panic(fmt.Sprintf("map val %s must specify key field", mapVal.Message.Desc.Name()))
-				}
-				tp, exist := msgMap[string(mapVal.Message.Desc.Name())]
-				if !exist {
-					panic(fmt.Sprintf("map val type %s not exist", mapVal.Message.Desc.Name()))
-				}
-				findMessageDep(fileMessagesMap, tp, msgMap)
-			} else {
-				panic(fmt.Sprintf("map val %s must specify key field", mapVal.Message.Desc.Name()))
+			if mapVal.Message != nil {
+				findMessageDep(allNeedGenMsg, mapVal.Message, msgMap)
 			}
 		} else {
 			if field.Message != nil {
-				tp, exist := msgMap[string(field.Message.Desc.Name())]
-				if !exist {
-					panic(fmt.Sprintf("map val type %s not exist", field.Message.Desc.Name()))
-				}
-				findMessageDep(fileMessagesMap, tp, msgMap)
+				findMessageDep(allNeedGenMsg, field.Message, msgMap)
 			}
 		}
 
